@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
 
@@ -28,6 +29,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Version bump
         run: |
           VERSION=$(grep 'mod_version' gradle.properties | cut -d'=' -f2)
@@ -43,7 +47,9 @@ jobs:
           fi
 
           echo "New version: $NEW_VERSION"
+
           sed -i "s/mod_version=$VERSION/mod_version=$NEW_VERSION/" gradle.properties
+
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Commit and Push new version
@@ -57,11 +63,25 @@ jobs:
 
           git push origin main
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Build Mod
+        run: |
+          ./gradlew build remapJar || ./gradlew build
 
-      - name: Build with Gradle
-        run: ./gradlew build
+      - name: Show generated artifacts
+        run: |
+          echo "Generated files:"
+          find build -type f \( -name "*.jar" -o -name "*.zip" \)
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p release-artifacts
+
+          find build -type f \( -name "*.jar" -o -name "*.zip" \) \
+            ! -name "*-sources.jar" \
+            ! -name "*-javadoc.jar" \
+            -exec cp {} release-artifacts/ \;
+
+          ls -R release-artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -70,10 +90,13 @@ jobs:
           name: "Release ${{ env.NEW_VERSION }}"
           draft: false
           prerelease: false
-          files: build/libs/MediaPlayerMod-*.jar
+          files: release-artifacts/*
           body: |
             Automatic release for version ${{ env.NEW_VERSION }}.
 
-            Built artifacts included in this release.
+            Included build artifacts:
+            - JAR files
+            - Remapped Fabric/Forge builds
+            - ZIP distributions (if generated)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
