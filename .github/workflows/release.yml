@@ -10,7 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed for push and release creation
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,8 +32,7 @@ jobs:
         run: |
           VERSION=$(grep 'mod_version' gradle.properties | cut -d'=' -f2)
           echo "Current version: $VERSION"
-          
-          # Increment minor/patch version (assuming X.Y format)
+
           if [[ $VERSION == *.* ]]; then
             MAJOR=$(echo $VERSION | cut -d'.' -f1)
             MINOR=$(echo $VERSION | cut -d'.' -f2)
@@ -41,7 +41,7 @@ jobs:
           else
             NEW_VERSION=$((VERSION + 1))
           fi
-          
+
           echo "New version: $NEW_VERSION"
           sed -i "s/mod_version=$VERSION/mod_version=$NEW_VERSION/" gradle.properties
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
@@ -50,14 +50,18 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
           git add gradle.properties
-          # If nothing changed, git commit will fail. Use an if check.
+
           git diff --quiet && git diff --staged --quiet || git commit -m "chore: bump version to ${{ env.NEW_VERSION }}"
+
           git push origin main
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Build with Gradle
-        run: 
-          ./gradlew build
+        run: ./gradlew build
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -69,7 +73,7 @@ jobs:
           files: build/libs/MediaPlayerMod-*.jar
           body: |
             Automatic release for version ${{ env.NEW_VERSION }}.
-            
+
             Built artifacts included in this release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
