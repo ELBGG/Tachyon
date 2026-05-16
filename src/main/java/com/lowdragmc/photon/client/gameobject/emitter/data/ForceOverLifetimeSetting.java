@@ -1,0 +1,43 @@
+package com.lowdragmc.photon.client.gameobject.emitter.data;
+
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.*;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.Curve;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.CurveConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.RandomCurve;
+import com.lowdragmc.photon.client.gameobject.emitter.particle.ParticleConfig;
+import com.lowdragmc.photon.client.gameobject.particle.IParticle;
+import org.joml.Vector3f;
+import lombok.Getter;
+import lombok.Setter;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+
+/**
+ * @author KilaBash
+ * @date 2023/5/30
+ * @implNote LifetimeByEmitterSpeed
+ * @port ELB_GG 
+ * @date_port 2026/03/29 
+ * @port_to fabric
+ */
+@Environment(EnvType.CLIENT)
+@Setter
+@Getter
+public class ForceOverLifetimeSetting {
+    public boolean enable = false;
+
+    
+    @NumberFunction3Config(common = @NumberFunctionConfig(types = {Constant.class, RandomConstant.class, Curve.class, RandomCurve.class}, curveConfig = @CurveConfig(bound = {-1, 1}, xAxis = "lifetime", yAxis = "force")))
+    protected NumberFunction3 force = new NumberFunction3(0, 0, 0);
+
+    @Setter
+    @Getter
+    
+    protected ParticleConfig.Space simulationSpace = ParticleConfig.Space.Local;
+
+    public Vector3f getForce(IParticle particle) {
+        return force.get(particle.getT(), () -> particle.getMemRandom(this)).mul(0.05f);
+    }
+
+    public boolean isEnable() { return enable; }
+}

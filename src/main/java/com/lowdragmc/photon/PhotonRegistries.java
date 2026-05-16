@@ -1,0 +1,62 @@
+package com.lowdragmc.photon;
+
+import com.lowdragmc.lowdraglib2.LDLib2;
+import com.lowdragmc.lowdraglib2.registry.AutoRegistry;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
+import com.lowdragmc.photon.client.gameobject.IFXObject;
+import com.lowdragmc.photon.client.gameobject.emitter.data.material.BlockTextureSheetMaterial;
+import com.lowdragmc.photon.client.gameobject.emitter.data.material.IMaterial;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunction;
+import com.lowdragmc.photon.client.gameobject.emitter.data.shape.IShape;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+
+import java.util.function.Supplier;
+
+public class PhotonRegistries {
+
+    @Environment(EnvType.CLIENT)
+    public static AutoRegistry.LDLibRegisterClient<IFXObject, Supplier<IFXObject>> FX_OBJECTS;
+
+    @Environment(EnvType.CLIENT)
+    public static AutoRegistry.LDLibRegisterClient<IMaterial, Supplier<IMaterial>> MATERIALS;
+
+    @Environment(EnvType.CLIENT)
+    public static AutoRegistry.LDLibRegisterClient<NumberFunction, Supplier<NumberFunction>> NUMBER_FUNCTIONS;
+
+    @Environment(EnvType.CLIENT)
+    public static AutoRegistry.LDLibRegisterClient<IShape, Supplier<IShape>> SHAPES;
+
+    static {
+        if (LDLib2.isClient()) {
+            Client.load();
+        }
+    }
+
+    public static void init() {
+    }
+
+    @Environment(EnvType.CLIENT)
+    private static class Client {
+        public static void load() {
+            FX_OBJECTS = AutoRegistry.LDLibRegisterClient
+                    .create(Photon.id("fx_object"), IFXObject.class, AutoRegistry::noArgsCreator);
+            MATERIALS = AutoRegistry.LDLibRegisterClient
+                    .create(Photon.id("material"), IMaterial.class, AutoRegistry::noArgsCreator);
+            NUMBER_FUNCTIONS = AutoRegistry.LDLibRegisterClient
+                    .create(Photon.id("number_function"), NumberFunction.class, AutoRegistry::noArgsCreator);
+            SHAPES = AutoRegistry.LDLibRegisterClient
+                    .create(Photon.id("shape"), IShape.class, AutoRegistry::noArgsCreator);
+            MATERIALS.register("missing", AutoRegistry.Holder.of(
+                    IMaterial.MissingMaterial.class.getAnnotation(LDLRegisterClient.class),
+                    IMaterial.MissingMaterial.class,
+                    () -> IMaterial.MISSING));
+            MATERIALS.register("block_atlas", AutoRegistry.Holder.of(
+                    BlockTextureSheetMaterial.class.getAnnotation(LDLRegisterClient.class),
+                    BlockTextureSheetMaterial.class,
+                    () -> BlockTextureSheetMaterial.INSTANCE));
+            LDLib2.LOGGER.info("Photon Editor Parity - Registered {} FX Objects, {} Materials, {} Number Functions, {} Shapes", 
+                    FX_OBJECTS.values().size(), MATERIALS.values().size(), NUMBER_FUNCTIONS.values().size(), SHAPES.values().size());
+        }
+    }
+}

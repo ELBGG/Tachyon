@@ -1,0 +1,49 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.lowdragmc.lowdraglib2.core.mixins",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.lowdragmc.lowdraglib2.core.mixins.LDLib2MixinPlugin",
+  "client": [
+    "BlockEntityRendererDispatcherMixin",
+    "BlockModelShaperMixin",
+    "BlockStateModelLoaderMixin",
+    "ItemModelShaperMixin",
+    "ItemRendererMixin",
+    "ModelBakeryMixin",
+    "ParticleEngineAccessor",
+    "ParticleEngineMixin",
+    "SimpleTextureMixin",
+    "SpriteSourceListMixin",
+    "WorldRendererMixin",
+    "accessor.BufferBuilderAccessor",
+    "accessor.MeshDataAccessor",
+    "accessor.MinecraftAccessor",
+    "accessor.ModelBakeryAccessor",
+    "accessor.MouseHandlerAccessor",
+    "accessor.ProgramTypeAccessor",
+    "accessor.ShaderInstanceAccessor",
+    "shader.GameRendererMixin",
+    "shader.ProgramManagerMixin",
+    "shader.ProgramMixin",
+    "shader.ProgramTypeMixin",
+    "shader.ShaderInstanceMixin",
+    "ui.AbstractContainerScreenMixin",
+    "ui.ContainerEventHandlerMixin",
+    "ui.ScreenMixin"
+  ],
+  "mixins": [
+    "BlockEntityMixin",
+    "PackConfigMixin",
+    "ReloadableResourceManagerMixin",
+    "ReloadableServerResourcesMixin",
+    "accessor.DelegatingOpsAccessor",
+    "accessor.SlotAccessor",
+    "ui.AbstractContainerMenuMixin",
+    "ui.MenuTypeMixin",
+    "ui.ServerPlayerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

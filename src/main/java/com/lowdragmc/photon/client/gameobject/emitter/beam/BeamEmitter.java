@@ -1,0 +1,145 @@
+package com.lowdragmc.photon.client.gameobject.emitter.beam;
+
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
+import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
+import com.lowdragmc.photon.Photon;
+import com.lowdragmc.photon.client.gameobject.emitter.Emitter;
+import com.lowdragmc.photon.client.gameobject.emitter.renderpipeline.RenderPassPipeline;
+import com.lowdragmc.photon.client.gameobject.particle.BeamParticle;
+import lombok.Getter;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nullable;
+import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.*;
+
+/**
+ * @author KilaBash
+ * @date 2023/6/21
+ * @implNote BeamEmitter
+ * @port ELB_GG 
+ * @date_port 2026/03/29 
+ * @port_to fabric
+ */
+@ParametersAreNonnullByDefault
+@LDLRegisterClient(name = "beam_emitter", registry = "photon:fx_object")
+public class BeamEmitter extends Emitter {
+        public static int VERSION = 2;
+
+    @Getter
+    @Persisted(subPersisted = true)
+    protected final BeamConfig config;
+
+    // runtime
+    protected BeamParticle beamParticle;
+
+    public BeamEmitter() {
+        this(new BeamConfig());
+    }
+
+    public BeamEmitter(BeamConfig config) {
+        this.config = config;
+    }
+
+    
+
+    @Override
+    public BeamEmitter shallowCopy() {
+        return new BeamEmitter(config);
+    }
+
+    @Override
+    public CompoundTag serializeNBT(HolderLookup.@NotNull Provider provider) {
+        var tag = super.serializeNBT(provider);
+        tag.putInt("_version", VERSION);
+        return tag;
+    }
+
+    
+
+    //////////////////////////////////////
+    //*****     particle logic     *****//
+    //////////////////////////////////////
+
+    @Override
+    public int getParticleAmount() {
+        return beamParticle.isAlive() ? 1 : 0;
+    }
+
+    @Override
+    public int getLifetime() {
+        return config.duration;
+    }
+
+    @Override
+    protected void updateOrigin() {
+        super.updateOrigin();
+        setLifetime(config.duration);
+    }
+
+    @Override
+    public boolean isLooping() {
+        return config.isLooping();
+    }
+
+    //////////////////////////////////////
+    //*****     particle logic     *****//
+    //////////////////////////////////////
+
+    @Override
+    protected void update() {
+        if (beamParticle.isAlive()) {
+            beamParticle.updateTick();
+            if(beamParticle.getDelay() > 0) age = 0;
+        } else {
+            remove();
+        }
+
+        super.update();
+    }
+
+    @Override
+    public float getT() {
+        if(beamParticle != null && beamParticle.getDelay() > 0) return 0;
+        return super.getT();
+    }
+
+    @Override
+    public float getT(float partialTicks) {
+        if(beamParticle != null && beamParticle.getDelay() > 0) return 0;
+        return super.getT(partialTicks);
+    }
+
+    @Override
+    public void reset() {
+        super.reset();
+        beamParticle = new BeamParticle(this, config);
+    }
+
+    public void prepareRenderPass(RenderPassPipeline buffer) {
+        if (isVisible()) {
+            buffer.pipeQueue(beamParticle.getRenderType(), Collections.singleton(beamParticle));
+        }
+    }
+
+    //////////////////////////////////////
+    //********      Emitter    *********//
+    //////////////////////////////////////
+
+    @Override
+    @Nullable
+    public AABB getCullBox(float partialTicks) {
+        return config.renderer.getCull().isEnable() ? config.renderer.getCull().getCullAABB(this, partialTicks) : null;
+    }
+
+    @Override
+    public void remove(boolean force) {
+        super.remove(force);
+        beamParticle.setRemoved(true);
+    }
+
+    public com.lowdragmc.photon.client.fx.IEffectExecutor getEffectExecutor() { return effectExecutor; }
+}

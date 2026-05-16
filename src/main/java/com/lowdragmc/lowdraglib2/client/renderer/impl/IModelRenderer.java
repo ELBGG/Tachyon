@@ -1,0 +1,243 @@
+package com.lowdragmc.lowdraglib2.client.renderer.impl;
+
+import com.lowdragmc.lowdraglib2.LDLib2;
+import com.lowdragmc.lowdraglib2.client.model.ModelFactory;
+import com.lowdragmc.lowdraglib2.client.renderer.*;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
+import com.mojang.blaze3d.vertex.PoseStack;
+import dev.vfyjxf.taffy.style.AlignItems;
+import lombok.Getter;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.model.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.block.state.BlockState;
+
+import javax.annotation.Nonnull;
+import org.jetbrains.annotations.Nullable;
+import java.io.File;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+
+@LDLRegisterClient(name = "json_model", registry = "ldlib2:renderer")
+public class IModelRenderer implements IRenderer {
+    @Getter
+        protected ResourceLocation modelLocation;
+    @Nullable
+    protected volatile BakedModel itemModel;
+    private volatile boolean itemModelInitialized;
+    protected Map<ModelState, BakedModel> modelCaches;
+
+    protected IModelRenderer() {
+        this(ResourceLocation.withDefaultNamespace("block/furnace"));
+    }
+
+    public IModelRenderer(ResourceLocation modelLocation) {
+        this.modelLocation = modelLocation;
+        if (LDLib2.isClient()) {
+            modelCaches = new ConcurrentHashMap<>();
+            registerEvent();
+        }
+    }
+
+    private synchronized void clearCache() {
+        if (LDLib2.isClient()) {
+            itemModel = null;
+            itemModelInitialized = false;
+            if (modelCaches != null) modelCaches.clear();
+        }
+    }
+
+    @Override
+    public IModelRenderer copy() {
+        return new IModelRenderer(modelLocation);
+    }
+
+    @Override
+    public void afterDeserialize() {
+        clearCache();
+    }
+
+    @Override
+    @Nonnull
+    public TextureAtlasSprite getParticleTexture(@Nullable BlockAndTintGetter level, @Nullable BlockPos pos, ModelData modelData) {
+        BakedModel model = getItemBakedModel();
+        if (model == null) {
+            return IRenderer.super.getParticleTexture(level, pos, modelData);
+        }
+        return model.getParticleIcon();
+    }
+    protected UnbakedModel getModel() {
+        return ModelFactory.getUnBakedModel(modelLocation);
+    }
+
+    @Override
+    public void renderItem(ItemStack stack,
+                           ItemDisplayContext transformType,
+                           boolean leftHand, PoseStack poseStack,
+                           MultiBufferSource buffer, int combinedLight,
+                           int combinedOverlay, BakedModel model) {
+        IItemRendererProvider.disabled.set(true);
+        model = getItemBakedModel(stack);
+        if (model != null) {
+            Minecraft.getInstance().getItemRenderer().render(stack, transformType, leftHand, poseStack, buffer, combinedLight, combinedOverlay, model);
+        }
+        IItemRendererProvider.disabled.set(false);
+    }
+
+    @Override
+    public boolean useBlockLight(ItemStack stack) {
+        var model = getItemBakedModel(stack);
+        if (model != null) {
+            return model.usesBlockLight();
+        }
+        return false;
+    }
+
+    @Override
+    public TriState useAO() {
+        var model = getItemBakedModel();
+        if (model != null) {
+            return model.useAmbientOcclusion() ? TriState.DEFAULT : TriState.FALSE;
+        }
+        return TriState.FALSE;
+    }
+
+    @Override
+    public TriState useAO(BlockState state, ModelData modelData, RenderType renderType) {
+        return IRenderer.super.useAO(state, modelData, renderType);
+    }
+
+    @Override
+    public List<BakedQuad> renderModel(@Nullable BlockAndTintGetter level, @Nullable BlockPos pos, @Nullable BlockState state, @Nullable Direction side, RandomSource rand, ModelData data, @Nullable RenderType renderType) {
+        var ibakedmodel = getBlockBakedModel(level, pos, state);
+        if (ibakedmodel == null) return Collections.emptyList();
+        return ibakedmodel.getQuads(state, side, rand);
+    }
+
+    @Override
+    public ChunkRenderTypeSet getRenderTypes(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource rand, ModelData modelData) {
+        var ibakedmodel = getBlockBakedModel(level, pos, state);
+        if (ibakedmodel != null) return com.lowdragmc.lowdraglib2.client.renderer.ChunkRenderTypeSet.of(net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(state));
+        return IRenderer.super.getRenderTypes(level, pos, state, rand, modelData);
+    }
+    @Nullable
+    protected BakedModel getItemBakedModel() {
+        if (!itemModelInitialized) {
+            synchronized (this) {
+                if (!itemModelInitialized) {
+                    var model = getModel();
+                    itemModel = model.bake(
+                            ModelFactory.getModelBaker(),
+                            this::materialMapping,
+                            BlockModelRotation.X0_Y0);
+                    itemModelInitialized = true;
+                }
+            }
+        }
+        return itemModel;
+    }
+    @Nullable
+    protected BakedModel getItemBakedModel(ItemStack itemStack) {
+        return getItemBakedModel();
+    }
+    @Nullable
+    protected BakedModel getBlockBakedModel(@Nullable BlockAndTintGetter level, @Nullable BlockPos pos, @Nullable BlockState state) {
+        if (level != null && pos != null && state != null && state.getBlock() instanceof IBlockRendererProvider provider) {
+            var modelState = provider.getModelState(level, pos, state);
+            if (modelState != null) {
+                return modelCaches.computeIfAbsent(modelState, ms -> getModel().bake(
+                        ModelFactory.getModelBaker(),
+                        this::materialMapping,
+                        ms));
+            }
+        }
+        return modelCaches.computeIfAbsent(BlockModelRotation.X0_Y0, ms -> getModel().bake(
+                ModelFactory.getModelBaker(),
+                this::materialMapping,
+                ms));
+    }
+    protected TextureAtlasSprite materialMapping(Material material) {
+        return material.sprite();
+    }
+    
+    @Override
+    public void onAdditionalModel(Consumer<ResourceLocation> registry) {
+        registry.accept(modelLocation);
+        clearCache();
+    }
+
+    @Override
+    public boolean isGui3d() {
+        var model = getItemBakedModel();
+        if (model == null) {
+            return IRenderer.super.isGui3d();
+        }
+        return model.isGui3d();
+    }
+
+        public void updateModelWithoutReloadingResource(ResourceLocation modelLocation) {
+        this.modelLocation = modelLocation;
+        clearCache();
+    }
+    public void updateModelWithReloadingResource(ResourceLocation modelLocation) {
+        updateModelWithoutReloadingResource(modelLocation);
+        var unBakedModel = getModel();
+        if (unBakedModel == ModelFactory.getUnBakedModel(ModelBakery.MISSING_MODEL_LOCATION)) {
+            Minecraft.getInstance().reloadResourcePacks();
+        }
+    }
+
+    
+
+
+    @Nullable
+    public static ResourceLocation getModelFromFile(File filePath) {
+        String fullPath = filePath.getPath().replace('\\', '/');
+
+        // find the "assets/" directory in the path
+        var assetsIndex = fullPath.indexOf("assets/");
+        if (assetsIndex == -1) {
+            return null;
+        }
+
+        var relativePath = fullPath.substring(assetsIndex + "assets/".length());
+
+        // find mod_id
+        var slashIndex = relativePath.indexOf('/');
+        if (slashIndex == -1) {
+            return null;
+        }
+
+        var modId = relativePath.substring(0, slashIndex);
+        var subPath = relativePath.substring(slashIndex + 1);
+
+        // find model location
+        var modelIndex = subPath.indexOf("models/");
+        if (modelIndex == -1) {
+            return null;
+        }
+
+        var modelPath = subPath.substring(modelIndex + "models/".length());
+        if (!modelPath.endsWith(".json")) {
+            return null;
+        }
+
+        var location = modId + ":" + modelPath.substring(0, modelPath.length() - 5); // remove ".json" suffix
+
+        if (LDLib2.isValidResourceLocation(location)) {
+            return ResourceLocation.parse(location);
+        }
+        return null;
+    }
+}

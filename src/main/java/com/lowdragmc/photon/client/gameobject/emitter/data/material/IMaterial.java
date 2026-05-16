@@ -1,0 +1,76 @@
+package com.lowdragmc.photon.client.gameobject.emitter.data.material;
+
+import com.lowdragmc.lowdraglib2.registry.ILDLRegisterClient;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
+import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
+import com.lowdragmc.lowdraglib2.utils.PersistedParser;
+import com.lowdragmc.photon.PhotonRegistries;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.nbt.CompoundTag;
+
+import javax.annotation.Nullable;
+import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.function.Supplier;
+
+/**
+ * @author KilaBash
+ * @date 2023/5/29
+ * @implNote Material
+ * @port ELB_GG 
+ * @date_port 2026/03/29 
+ * @port_to fabric
+ */
+@Environment(EnvType.CLIENT)
+@ParametersAreNonnullByDefault
+public interface IMaterial extends IPersistedSerializable, ILDLRegisterClient<IMaterial, Supplier<IMaterial>> {
+    // region builtin material
+    @LDLRegisterClient(name = "missing", registry = "photon:material", manual = true)
+    final class MissingMaterial implements IMaterial {
+        @Override
+        public ShaderInstance begin(MaterialContext context) {
+            RenderSystem.setShaderTexture(0, MissingTextureAtlasSprite.getTexture().getId());
+            return GameRenderer.getRendertypeSolidShader();
+        }
+
+
+    };
+    MissingMaterial MISSING = new MissingMaterial();
+    // endregion
+
+    Codec<IMaterial> CODEC = PhotonRegistries.MATERIALS.optionalCodec().dispatch(ILDLRegisterClient::getRegistryHolderOptional,
+            optional -> optional.map(holder -> PersistedParser.createCodec(holder.value()).fieldOf("data"))
+                    .orElseGet(() -> MapCodec.unit(MISSING)));
+
+    @Nullable
+    default CompoundTag serializeWrapper() {
+        return (CompoundTag) CODEC.encodeStart(NbtOps.INSTANCE, this).result().orElse(null);
+    }
+
+    static IMaterial deserializeWrapper(Tag tag) {
+        return CODEC.parse(NbtOps.INSTANCE, tag).result().orElse(MISSING);
+    }
+
+    ShaderInstance begin(MaterialContext context);
+
+
+
+    default void end(MaterialContext context) {
+
+    }
+
+    default IMaterial copy() {
+        return CODEC.encodeStart(NbtOps.INSTANCE, this).result()
+                .flatMap(tag -> CODEC.parse(NbtOps.INSTANCE, tag).result())
+                .orElse(MISSING);
+    }
+
+}

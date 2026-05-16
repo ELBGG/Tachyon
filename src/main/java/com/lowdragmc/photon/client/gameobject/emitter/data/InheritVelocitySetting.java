@@ -1,0 +1,49 @@
+package com.lowdragmc.photon.client.gameobject.emitter.data;
+
+import com.lowdragmc.photon.client.gameobject.emitter.IParticleEmitter;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.Constant;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunction;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunctionConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.RandomConstant;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.Curve;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.CurveConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.RandomCurve;
+import org.joml.Vector3f;
+import com.lowdragmc.photon.client.gameobject.emitter.Emitter;
+import lombok.Getter;
+import lombok.Setter;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+
+/**
+ * @author KilaBash
+ * @date 2023/5/30
+ * @implNote InheritVelocitySetting
+ * @port ELB_GG 
+ * @date_port 2026/03/29 
+ * @port_to fabric
+ */
+@Environment(EnvType.CLIENT)
+@Setter
+@Getter
+public class InheritVelocitySetting {
+    public boolean enable = true;
+    public enum Mode {
+        CURRENT,
+        INITIAL,
+    }
+
+    
+    protected Mode mode = Mode.INITIAL;
+
+    
+    @NumberFunctionConfig(types = {Constant.class, RandomConstant.class, Curve.class, RandomCurve.class}, defaultValue = 1f, curveConfig = @CurveConfig(bound = {-1, 1}, xAxis = "lifetime", yAxis = "speed modifier"))
+    protected NumberFunction multiply = NumberFunction.constant(1);
+
+    public Vector3f getVelocity(IParticleEmitter emitter) {
+        return emitter.getVelocity().mul(multiply.get(emitter.getT(), () -> emitter.getMemRandom(this)).floatValue());
+    }
+
+    public boolean isEnable() { return enable; }
+    public Mode getMode() { return mode; }
+}

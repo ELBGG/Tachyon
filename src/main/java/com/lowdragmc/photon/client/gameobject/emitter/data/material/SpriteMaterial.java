@@ -1,0 +1,98 @@
+package com.lowdragmc.photon.client.gameobject.emitter.data.material;
+
+import com.lowdragmc.lowdraglib2.client.shader.LDProgramDefineManager;
+import com.lowdragmc.lowdraglib2.client.shader.LDShaderInstance;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
+import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
+import com.lowdragmc.photon.Photon;
+import com.lowdragmc.photon.client.PhotonShaders;
+import com.mojang.blaze3d.shaders.Program;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.resources.ResourceLocation;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import org.joml.Vector4f;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.annotation.ParametersAreNonnullByDefault;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import com.lowdragmc.photon.core.mixins.accessor.ParticleEngineAccessor;
+
+@Environment(EnvType.CLIENT)
+@ParametersAreNonnullByDefault
+@LDLRegisterClient(name = "sprite", registry = "photon:material")
+public class SpriteMaterial extends ShaderInstanceMaterial {
+    @Persisted
+    public ResourceLocation spriteLocation = ResourceLocation.parse("");
+    
+    
+    protected float discardThreshold = 0.1f;
+    
+    
+    protected Vector4f hdr = new Vector4f(0, 0, 0, 1);
+    
+    protected TextureMaterial.HDRMode hdrMode = TextureMaterial.HDRMode.ADDITIVE;
+    private static final Map<String, ShaderInstance> spriteHDRParticleShaders = new HashMap<>();
+
+    @Nullable
+    private SpriteSet getSpriteSet() {
+        if (spriteLocation == null) return null;
+        return (SpriteSet) ((ParticleEngineAccessor) Minecraft.getInstance().particleEngine).getSpriteSets().get(spriteLocation);
+    }
+
+    @Override
+    public ShaderInstance getShader(@Nonnull MaterialContext context) {
+        if (context.getShaderDefine().isEmpty()) {
+            return PhotonShaders.getSpriteHDRParticleShader();
+        } else {
+            return spriteHDRParticleShaders.computeIfAbsent(context.getShaderDefine(), define -> {
+                // remove cache
+                Program.Type.FRAGMENT.getPrograms().remove(PhotonShaders.getSpriteHDRParticleShader().getFragmentProgram().getName());
+                Program.Type.VERTEX.getPrograms().remove(PhotonShaders.getSpriteHDRParticleShader().getVertexProgram().getName());
+                LDProgramDefineManager.addProgramDefine(define);
+                LDShaderInstance shader;
+                try {
+                    shader = LDShaderInstance.create(Photon.id("sprite_hdr_particle"), DefaultVertexFormat.BLOCK);
+                } catch (Throwable e) {
+                    Photon.LOGGER.error("Failed to create sprite HDR particle shader", e);
+                    throw new RuntimeException(e);
+                }
+                LDProgramDefineManager.removeProgramDefine(define);
+                return shader;
+            });
+        }
+    }
+
+    @Override
+    public void setupUniform(MaterialContext context) {
+        var shader = getShader(context);
+        var sprite = getSpriteSet();
+        if (sprite == null) {
+            RenderSystem.setShaderTexture(0, TextureManager.INTENTIONAL_MISSING_TEXTURE);
+            shader.safeGetUniform("U_SpriteUV").set(0f, 0f, 1f, 1f);
+        } else {
+            var spriteTexture = sprite.get(0, 1);
+            RenderSystem.setShaderTexture(0, spriteTexture.atlasLocation());
+            shader.safeGetUniform("U_SpriteUV").set(spriteTexture.getU0(), spriteTexture.getV0(), spriteTexture.getU1(), spriteTexture.getV1());
+        }
+        shader.safeGetUniform("DiscardThreshold").set(discardThreshold);
+        if (context.isRenderingPreview()) {
+            shader.safeGetUniform("HDR").set(hdr.x, hdr.y, hdr.z, 1);
+            shader.safeGetUniform("HDRMode").set(hdrMode.mode);
+        } else {
+            shader.safeGetUniform("HDR").set(hdr.x, hdr.y, hdr.z, hdr.w);
+            shader.safeGetUniform("HDRMode").set(hdrMode.mode);
+        }
+    }
+
+    
+}

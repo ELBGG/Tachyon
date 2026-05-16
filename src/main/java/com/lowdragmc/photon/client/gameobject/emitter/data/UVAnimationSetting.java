@@ -1,0 +1,87 @@
+package com.lowdragmc.photon.client.gameobject.emitter.data;
+
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.Constant;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunction;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunctionConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.RandomConstant;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.Curve;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.CurveConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.RandomCurve;
+import com.lowdragmc.photon.client.gameobject.particle.IParticle;
+import lombok.Getter;
+import lombok.Setter;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import org.joml.Vector2i;
+import org.joml.Vector4f;
+
+/**
+ * @author KilaBash
+ * @date 2023/5/31
+ * @implNote UVAnimation
+ * @port ELB_GG 
+ * @date_port 2026/03/29 
+ * @port_to fabric
+ */
+@Environment(EnvType.CLIENT)
+public class UVAnimationSetting {
+    public boolean enable = true;
+    public enum Animation {
+        WholeSheet,
+        SingleRow,
+    }
+
+    @Setter
+    @Getter
+    
+    
+    protected Vector2i tiles = new Vector2i(1, 1);
+
+    @Setter
+    @Getter
+    
+    protected Animation animation = Animation.WholeSheet;
+
+    @Setter
+    @Getter
+    
+    @NumberFunctionConfig(types = {Constant.class, RandomConstant.class, Curve.class, RandomCurve.class}, min = 0, curveConfig = @CurveConfig(bound = {0, 4}, xAxis = "lifetime", yAxis = "frame over time"))
+    protected NumberFunction frameOverTime = NumberFunction.constant(0);
+
+    @Setter
+    @Getter
+    
+    @NumberFunctionConfig(types = {Constant.class, RandomConstant.class}, min = 0)
+    protected NumberFunction startFrame = NumberFunction.constant(0);
+
+    @Setter
+    @Getter
+    
+    
+    protected float cycle = 1;
+
+    public Vector4f getUVs(IParticle particle, float partialTicks) {
+        var t = particle.getT(partialTicks);
+        var cellU = 1f / tiles.x();
+        var cellV = 1f / tiles.y();
+        var currentFrame = this.startFrame.get(t, () -> particle.getMemRandom("startFrame")).floatValue();
+        currentFrame += cycle * frameOverTime.get(t, () -> particle.getMemRandom("frameOverTime")).floatValue();
+        float u0, v0, u1, v1;
+        var cellSize = tiles.x();
+        if (animation == Animation.WholeSheet) {
+            int X = (int) (currentFrame % cellSize);
+            int Y = (int) (currentFrame / cellSize);
+            u0 = X * cellU;
+            v0 = Y * cellV;
+        } else {
+            int X = (int) (currentFrame % cellSize);
+            int Y = (int) (particle.getMemRandom("randomRow") * tiles.y());
+            u0 = X * cellU;
+            v0 = Y * cellV;
+        }
+        u1 = u0 + cellU;
+        v1 = v0 + cellV;
+        return new Vector4f(u0, v0, u1, v1);
+    }
+    public boolean isEnable() { return enable; }
+}

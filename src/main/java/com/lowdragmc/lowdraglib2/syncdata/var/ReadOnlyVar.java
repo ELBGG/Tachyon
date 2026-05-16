@@ -1,0 +1,62 @@
+package com.lowdragmc.lowdraglib2.syncdata.var;
+
+import com.lowdragmc.lowdraglib2.syncdata.field.ManagedKey;
+import lombok.Getter;
+
+import org.jetbrains.annotations.Nullable;
+import java.lang.ref.WeakReference;
+public final class ReadOnlyVar<T> implements IVar<T> {
+    @Getter
+    private final IVar<T> var;
+    @Getter
+    @Nullable
+    private final IReadOnlyManagedVar<T> managedVar;
+    @Nullable
+    private final WeakReference<T> valueCache;
+
+    public ReadOnlyVar(IVar<T> var, @Nullable IReadOnlyManagedVar<T> managedVar) {
+        this.var = var;
+        this.managedVar = managedVar;
+        if (isReadOnlyManaged()) {
+            valueCache = null;
+        } else {
+            valueCache = new WeakReference<>(value());
+        }
+    }
+
+    public static <T> ReadOnlyVar<T> of(IVar<T> var) {
+        return new ReadOnlyVar<>(var, null);
+    }
+
+    public static <T> ReadOnlyVar<T> of(IVar<T> var, IReadOnlyManagedVar<T> managedVar) {
+        return new ReadOnlyVar<>(var, managedVar);
+    }
+
+    public boolean isReadOnlyManaged() {
+        return managedVar != null;
+    }
+
+    public static <T> ReadOnlyVar<T> of(ManagedKey key, Object instance) {
+        return new ReadOnlyVar<>(FieldVar.of(key, instance),
+                key.isReadOnlyManaged() ? IReadOnlyManagedVar.fromManagedKey(key, instance) : null);
+    }
+
+    @Override
+    public T value() {
+        return (isReadOnlyManaged() || valueCache == null) ? var.value() : valueCache.get();
+    }
+
+    @Override
+    public void set(T value) {
+        if (isReadOnlyManaged()) {
+            var.set(value);
+        } else {
+            throw new UnsupportedOperationException("Cannot set value to a read-only field");
+        }
+    }
+
+    @Override
+    public Class<T> getType() {
+        return var.getType();
+    }
+}

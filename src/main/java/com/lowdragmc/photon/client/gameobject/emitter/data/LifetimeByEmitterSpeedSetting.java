@@ -1,0 +1,48 @@
+package com.lowdragmc.photon.client.gameobject.emitter.data;
+
+import com.lowdragmc.lowdraglib2.math.Range;
+import com.lowdragmc.photon.client.gameobject.emitter.IParticleEmitter;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.Constant;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunction;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.NumberFunctionConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.RandomConstant;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.Curve;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.CurveConfig;
+import com.lowdragmc.photon.client.gameobject.emitter.data.number.curve.RandomCurve;
+import com.lowdragmc.photon.client.gameobject.particle.IParticle;
+import lombok.Getter;
+import lombok.Setter;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+
+/**
+ * @author KilaBash
+ * @date 2023/5/30
+ * @implNote LifetimeByEmitterSpeed
+ * @port ELB_GG 
+ * @date_port 2026/03/29 
+ * @port_to fabric
+ */
+@Environment(EnvType.CLIENT)
+@Setter
+@Getter
+public class LifetimeByEmitterSpeedSetting {
+    public boolean enable = true;
+
+    
+    @NumberFunctionConfig(types = {Constant.class, RandomConstant.class, Curve.class, RandomCurve.class}, min = 0, defaultValue = 1f, curveConfig = @CurveConfig(bound = {0, 1}, xAxis = "multiplier", yAxis = "emitter velocity"))
+    protected NumberFunction multiplier = NumberFunction.constant(1);
+
+    
+    
+    protected Range speedRange = Range.of(0f, 1f);
+
+    public int getLifetime(IParticle particle, IParticleEmitter emitter, int initialLifetime) {
+        var value = emitter.getVelocity().length() * 20;
+        var min = speedRange.getMin().floatValue();
+        var max = speedRange.getMax().floatValue();
+        return (int) (multiplier.get((value - min) / (max - min), () -> particle.getMemRandom(this)).floatValue() * initialLifetime);
+    }
+
+    public boolean isEnable() { return enable; }
+}
