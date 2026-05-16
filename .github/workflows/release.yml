@@ -56,9 +56,7 @@ jobs:
           git push origin main
 
       - name: Build with Gradle
-        run: |
-          chmod +x gradlew sound-categories/gradlew
-          cd sound-categories && ./gradlew build && cd -
+        run: 
           ./gradlew build
 
       - name: Create Release
